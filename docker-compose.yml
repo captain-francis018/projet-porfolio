@@ -1,0 +1,53 @@
+services:
+
+  # ─── BASE DE DONNEES ──────────────────────────────
+  mongodb:
+    image: mongo:7
+    container_name: portfolio-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - portfolio-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── BACKEND ─────────────────────────────────────
+  backend:
+    build: ./backend
+    container_name: portfolio-api
+    restart: unless-stopped
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/portfolio
+      - PORT=5000
+      - CORS_ORIGIN=http://localhost
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - portfolio-net
+
+  # ─── FRONTEND ────────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: portfolio-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - portfolio-net
+
+# ─── VOLUMES ──────────────────────────────────────
+volumes:
+  mongo_data:
+
+# ─── RESEAU INTERNE ───────────────────────────────
+networks:
+  portfolio-net:
+    driver: bridge
+

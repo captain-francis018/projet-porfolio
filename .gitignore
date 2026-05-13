@@ -1,0 +1,25 @@
+# Dépendances Node.js
+# Se régénèrent automatiquement avec : npm install
+node_modules/
+
+# Variables d'environnement (mots de passe, tokens, URIs)
+# Ne JAMAIS commiter ces fichiers sur GitHub
+.env
+.env.local
+.env.production
+
+# Dossier de build Vite (généré par : npm run build)
+# Docker s'en charge lui-même lors du build de l'image
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Fichiers système macOS / Windows
+.DS_Store
+Thumbs.db
+
+# Dossier temporaire Docker
+.dockerignore
+
