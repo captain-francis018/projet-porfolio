@@ -20,35 +20,30 @@ pipeline {
 
         // ── STAGE 2 : BUILD DOCKER ────────────────────────────
         stage('Build') {
-            steps {
-                echo "Construction des images Docker..."
-                sh '''
-                    cd ${PROJECT_PATH}
-                    docker compose build --no-cache
-                    echo "Images construites "
-                '''
-            }
-        }
+    steps {
+        echo "Construction des images Docker..."
+        sh 'cd ${PROJECT_PATH} && docker compose build'
+        echo "Images construites ✓"
+    }
+}
 
         // ── STAGE 3 : DÉPLOIEMENT ─────────────────────────────
         stage('Deploy') {
-            steps {
-                echo "Déploiement..."
-                sh '''
-                    # Copier les fichiers mis à jour depuis le workspace
-                    cp -r ${WORKSPACE}/backend/. ${PROJECT_PATH}/backend/
-                    cp -r ${WORKSPACE}/frontend/. ${PROJECT_PATH}/frontend/
-                    cp ${WORKSPACE}/docker-compose.yml ${PROJECT_PATH}/
+    steps {
+        echo "Arrêt des anciens conteneurs..."
+        sh 'cd ${PROJECT_PATH} && docker compose down || true'
 
-                    # Redémarrer les conteneurs
-                    cd ${PROJECT_PATH}
-                    docker compose up --build -d
-                    sleep 8
-                    docker compose ps
-                    echo "Déployé "
-                '''
-            }
-        }
+        echo "Démarrage des conteneurs..."
+        sh 'cd ${PROJECT_PATH} && docker compose up -d mongodb'
+        sh 'sleep 15'
+        sh 'cd ${PROJECT_PATH} && docker compose up -d backend'
+        sh 'sleep 5'
+        sh 'cd ${PROJECT_PATH} && docker compose up -d frontend'
+        sh 'sleep 5'
+        sh 'cd ${PROJECT_PATH} && docker compose ps'
+        echo "Déployé "
+    }
+}
 
         // ── STAGE 4 : HEALTH CHECK ────────────────────────────
         stage('Health Check') {
