@@ -171,7 +171,7 @@ pipeline {
         always {
 
             echo "Nettoyage du workspace..."
-
+//tess
             cleanWs()
         }
     }
