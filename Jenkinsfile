@@ -1,6 +1,13 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKERHUB_USER = 'rimka03'
+        IMAGE_BACKEND   = "${DOCKERHUB_USER}/portfolio-backend"
+        IMAGE_FRONTEND  = "${DOCKERHUB_USER}/portfolio-frontend"
+        IMAGE_TAG       = "${env.BUILD_NUMBER}"
+    }
+
     stages {
 
         // ── STAGE 1 : RÉCUPÉRATION DU CODE ───────────────────
@@ -29,7 +36,40 @@ pipeline {
             }
         }
 
-        // ── STAGE 3 : DÉPLOIEMENT ────────────────────────────
+        // ── STAGE 3 : PUSH DOCKER HUB ────────────────────────
+        stage('Push Docker Hub') {
+            steps {
+                echo "Publication des images sur Docker Hub..."
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'dokerhub_access',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
+                        # Tag et push Backend
+                        docker tag projet-porfolio-backend $IMAGE_BACKEND:$IMAGE_TAG
+                        docker tag projet-porfolio-backend $IMAGE_BACKEND:latest
+                        docker push $IMAGE_BACKEND:$IMAGE_TAG
+                        docker push $IMAGE_BACKEND:latest
+
+                        # Tag et push Frontend
+                        docker tag projet-porfolio-frontend $IMAGE_FRONTEND:$IMAGE_TAG
+                        docker tag projet-porfolio-frontend $IMAGE_FRONTEND:latest
+                        docker push $IMAGE_FRONTEND:$IMAGE_TAG
+                        docker push $IMAGE_FRONTEND:latest
+
+                        docker logout
+                    '''
+                }
+
+                echo "Images publiées sur Docker Hub "
+            }
+        }
+
+        // ── STAGE 4 : DÉPLOIEMENT ────────────────────────────
         stage('Deploy') {
             steps {
 
@@ -73,7 +113,7 @@ pipeline {
             }
         }
 
-        // ── STAGE 4 : HEALTH CHECK ───────────────────────────
+        // ── STAGE 5 : HEALTH CHECK ───────────────────────────
         stage('Health Check') {
             steps {
 
@@ -117,6 +157,12 @@ pipeline {
                 <p><b>Build :</b> ${env.BUILD_NUMBER}</p>
 
                 <p><b>Statut :</b> SUCCESS</p>
+
+                <p><b>Images Docker Hub :</b></p>
+                <ul>
+                    <li>captainfrancis018/portfolio-backend:${env.BUILD_NUMBER}</li>
+                    <li>captainfrancis018/portfolio-frontend:${env.BUILD_NUMBER}</li>
+                </ul>
 
                 <p><b>Pipeline Jenkins :</b></p>
 
@@ -171,7 +217,7 @@ pipeline {
         always {
 
             echo "Nettoyage du workspace..."
-//tess
+
             cleanWs()
         }
     }
