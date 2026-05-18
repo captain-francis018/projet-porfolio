@@ -42,7 +42,7 @@ stage('Push Docker Hub') {
         echo "Publication des images sur Docker Hub..."
 
         withCredentials([usernamePassword(
-            credentialsId: 'dockerhub-credentials',
+            credentialsId: 'dokerhub_access',
             usernameVariable: 'DOCKER_USER',
             passwordVariable: 'DOCKER_PASS'
         )]) {
