@@ -37,88 +37,88 @@ pipeline {
         }
 
         // ── STAGE 3 : PUSH DOCKER HUB ────────────────────────
-stage('Push Docker Hub') {
-    steps {
-        echo "Publication des images sur Docker Hub..."
-
-        withCredentials([usernamePassword(
-            credentialsId: 'dokerhub_access',
-            usernameVariable: 'DOCKER_USER',
-            passwordVariable: 'DOCKER_PASS'
-        )]) {
-            sh '''
-                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-
-                # Récupérer dynamiquement les noms des images buildées
-                BACKEND_IMAGE=$(docker compose images -q backend | xargs docker inspect --format='{{index .RepoTags 0}}' | cut -d: -f1)
-                FRONTEND_IMAGE=$(docker compose images -q frontend | xargs docker inspect --format='{{index .RepoTags 0}}' | cut -d: -f1)
-
-                echo "Backend image détectée : $BACKEND_IMAGE"
-                echo "Frontend image détectée : $FRONTEND_IMAGE"
-
-                # Tag et push Backend
-                docker tag $BACKEND_IMAGE $IMAGE_BACKEND:$IMAGE_TAG
-                docker tag $BACKEND_IMAGE $IMAGE_BACKEND:latest
-                docker push $IMAGE_BACKEND:$IMAGE_TAG
-                docker push $IMAGE_BACKEND:latest
-
-                # Tag et push Frontend
-                docker tag $FRONTEND_IMAGE $IMAGE_FRONTEND:$IMAGE_TAG
-                docker tag $FRONTEND_IMAGE $IMAGE_FRONTEND:latest
-                docker push $IMAGE_FRONTEND:$IMAGE_TAG
-                docker push $IMAGE_FRONTEND:latest
-
-                docker logout
-            '''
-        }
-
-        echo "Images publiées sur Docker Hub "
-    }
-}
-
-        // ── STAGE 4 : DÉPLOIEMENT ────────────────────────────
-        stage('Deploy') {
+        stage('Push Docker Hub') {
             steps {
+                echo "Publication des images sur Docker Hub..."
 
-                echo "Arrêt des anciens conteneurs..."
+                withCredentials([usernamePassword(
+                    credentialsId: 'dokerhub-access',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                sh '''
-                    docker compose down || true
-                '''
+                        # Récupérer dynamiquement le nom des images depuis la config compose
+                        BACKEND_IMAGE=$(docker compose config --images | grep backend | head -1)
+                        FRONTEND_IMAGE=$(docker compose config --images | grep frontend | head -1)
 
-                echo "Démarrage MongoDB..."
+                        echo "Backend image détectée  : $BACKEND_IMAGE"
+                        echo "Frontend image détectée : $FRONTEND_IMAGE"
 
-                sh '''
-                    docker compose up -d mongodb
-                '''
+                        # Tag et push Backend
+                        docker tag $BACKEND_IMAGE $IMAGE_BACKEND:$IMAGE_TAG
+                        docker tag $BACKEND_IMAGE $IMAGE_BACKEND:latest
+                        docker push $IMAGE_BACKEND:$IMAGE_TAG
+                        docker push $IMAGE_BACKEND:latest
 
-                sh 'sleep 15'
+                        # Tag et push Frontend
+                        docker tag $FRONTEND_IMAGE $IMAGE_FRONTEND:$IMAGE_TAG
+                        docker tag $FRONTEND_IMAGE $IMAGE_FRONTEND:latest
+                        docker push $IMAGE_FRONTEND:$IMAGE_TAG
+                        docker push $IMAGE_FRONTEND:latest
 
-                echo "Démarrage Backend..."
+                        docker logout
+                    '''
+                }
 
-                sh '''
-                    docker compose up -d backend
-                '''
-
-                sh 'sleep 5'
-
-                echo "Démarrage Frontend..."
-
-                sh '''
-                    docker compose up -d frontend
-                '''
-
-                sh 'sleep 5'
-
-                echo "État des conteneurs..."
-
-                sh '''
-                    docker compose ps
-                '''
-
-                echo "Déploiement terminé "
+                echo "Images publiées sur Docker Hub "
             }
         }
+
+            // ── STAGE 4 : DÉPLOIEMENT ────────────────────────────
+            stage('Deploy') {
+                steps {
+
+                    echo "Arrêt des anciens conteneurs..."
+
+                    sh '''
+                        docker compose down || true
+                    '''
+
+                    echo "Démarrage MongoDB..."
+
+                    sh '''
+                        docker compose up -d mongodb
+                    '''
+
+                    sh 'sleep 15'
+
+                    echo "Démarrage Backend..."
+
+                    sh '''
+                        docker compose up -d backend
+                    '''
+
+                    sh 'sleep 5'
+
+                    echo "Démarrage Frontend..."
+
+                    sh '''
+                        docker compose up -d frontend
+                    '''
+
+                    sh 'sleep 5'
+
+                    echo "État des conteneurs..."
+
+                    sh '''
+                        docker compose ps
+                    '''
+
+                    echo "Déploiement terminé "
+                }
+            }
 
         // ── STAGE 5 : HEALTH CHECK ───────────────────────────
         stage('Health Check') {
