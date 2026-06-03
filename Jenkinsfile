@@ -6,37 +6,78 @@ pipeline {
         IMAGE_BACKEND   = "${DOCKERHUB_USER}/portfolio-backend"
         IMAGE_FRONTEND  = "${DOCKERHUB_USER}/portfolio-frontend"
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
+	SONAR_URL       = 'http://192.168.30.20:9000'
     }
 
     stages {
 
-        // ── STAGE 1 : RÉCUPÉRATION DU CODE ───────────────────
+        // ── STAGE 1 : CLONE ───────────────────────────────
         stage('Clone') {
             steps {
                 echo "Récupération du code depuis GitHub..."
-
                 git branch: 'main',
                     credentialsId: 'github-credentials',
                     url: 'https://github.com/captain-francis018/projet-porfolio.git'
-
                 echo "Code récupéré "
             }
         }
 
-        // ── STAGE 2 : BUILD DOCKER ───────────────────────────
+        // ── STAGE 2 : ANALYSE SONARQUBE ──────────────────
+        stage('SonarQube Analysis') {
+            steps {
+                echo "Analyse qualité du code..."
+
+                withSonarQubeEnv('sonarqube-server') {
+                    sh '''
+                        # Analyse Backend (Node.js)
+                        cd backend
+                        npx sonar-scanner \
+                            -Dsonar.projectKey=portfolio-backend \
+                            -Dsonar.projectName="Portfolio Backend" \
+                            -Dsonar.sources=. \
+                            -Dsonar.exclusions=node_modules/**,coverage/** \
+                            -Dsonar.host.url=$SONAR_URL
+                        cd ..
+
+                        # Analyse Frontend (React)
+                        cd frontend
+                        npx sonar-scanner \
+                            -Dsonar.projectKey=portfolio-frontend \
+                            -Dsonar.projectName="Portfolio Frontend" \
+                            -Dsonar.sources=src \
+                            -Dsonar.exclusions=node_modules/**,dist/** \
+                            -Dsonar.host.url=$SONAR_URL
+                        cd ..
+                    '''
+                }
+
+                echo "Analyse terminée ✅"
+            }
+        }
+
+        // ── STAGE 3 : QUALITY GATE ───────────────────────
+        stage('Quality Gate') {
+            steps {
+                echo "Vérification Quality Gate..."
+
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+
+                echo "Quality Gate passé ✅"
+            }
+        }
+
+        // ── STAGE 4 : BUILD DOCKER ───────────────────────
         stage('Build') {
             steps {
                 echo "Construction des images Docker..."
-
-                sh '''
-                    docker compose build
-                '''
-
+                sh 'docker compose build'
                 echo "Images construites "
             }
         }
 
-        // ── STAGE 3 : PUSH DOCKER HUB ────────────────────────
+        // ── STAGE 5 : PUSH DOCKER HUB ────────────────────
         stage('Push Docker Hub') {
             steps {
                 echo "Publication des images sur Docker Hub..."
@@ -49,20 +90,17 @@ pipeline {
                     sh '''
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                        # Récupérer dynamiquement le nom des images depuis la config compose
                         BACKEND_IMAGE=$(docker compose config --images | grep backend | head -1)
                         FRONTEND_IMAGE=$(docker compose config --images | grep frontend | head -1)
 
                         echo "Backend image détectée  : $BACKEND_IMAGE"
                         echo "Frontend image détectée : $FRONTEND_IMAGE"
 
-                        # Tag et push Backend
                         docker tag $BACKEND_IMAGE $IMAGE_BACKEND:$IMAGE_TAG
                         docker tag $BACKEND_IMAGE $IMAGE_BACKEND:latest
                         docker push $IMAGE_BACKEND:$IMAGE_TAG
                         docker push $IMAGE_BACKEND:latest
 
-                        # Tag et push Frontend
                         docker tag $FRONTEND_IMAGE $IMAGE_FRONTEND:$IMAGE_TAG
                         docker tag $FRONTEND_IMAGE $IMAGE_FRONTEND:latest
                         docker push $IMAGE_FRONTEND:$IMAGE_TAG
@@ -76,67 +114,44 @@ pipeline {
             }
         }
 
-            // ── STAGE 4 : DÉPLOIEMENT ────────────────────────────
-            stage('Deploy') {
-                steps {
+        // ── STAGE 6 : DEPLOY ─────────────────────────────
+        stage('Deploy') {
+            steps {
+                echo "Arrêt des anciens conteneurs..."
+                sh 'docker compose down || true'
 
-                    echo "Arrêt des anciens conteneurs..."
+                echo "Démarrage MongoDB..."
+                sh 'docker compose up -d mongodb'
+                sh 'sleep 15'
 
-                    sh '''
-                        docker compose down || true
-                    '''
+                echo "Démarrage Backend..."
+                sh 'docker compose up -d backend'
+                sh 'sleep 5'
 
-                    echo "Démarrage MongoDB..."
+                echo "Démarrage Frontend..."
+                sh 'docker compose up -d frontend'
+                sh 'sleep 5'
 
-                    sh '''
-                        docker compose up -d mongodb
-                    '''
+                echo "État des conteneurs..."
+                sh 'docker compose ps'
 
-                    sh 'sleep 15'
-
-                    echo "Démarrage Backend..."
-
-                    sh '''
-                        docker compose up -d backend
-                    '''
-
-                    sh 'sleep 5'
-
-                    echo "Démarrage Frontend..."
-
-                    sh '''
-                        docker compose up -d frontend
-                    '''
-
-                    sh 'sleep 5'
-
-                    echo "État des conteneurs..."
-
-                    sh '''
-                        docker compose ps
-                    '''
-
-                    echo "Déploiement terminé "
-                }
+                echo "Déploiement terminé "
             }
+        }
 
-        // ── STAGE 5 : HEALTH CHECK ───────────────────────────
+        // ── STAGE 7 : HEALTH CHECK ───────────────────────
         stage('Health Check') {
             steps {
-
                 echo "Vérification des services..."
-
                 sh '''
                     sleep 10
 
                     echo "Test API..."
-
                     curl -sf http://localhost/api/projects \
                         && echo "API OK " \
                         || (echo "API KO " && exit 1)
 
                     echo "Test Frontend..."
-
                     curl -sf http://localhost \
                         | grep -q "Abdoukarim" \
                         && echo "Frontend OK " \
@@ -146,85 +161,53 @@ pipeline {
         }
     }
 
-    // ── POST ACTIONS ────────────────────────────────────────
+    // ── POST ACTIONS ────────────────────────────────────
     post {
-
         success {
-
             echo "Pipeline réussi — Portfolio déployé "
-
             emailext (
                 subject: "SUCCESS - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-
                 body: """
                 <h2>Déploiement réussi </h2>
-
                 <p><b>Projet :</b> ${env.JOB_NAME}</p>
-
                 <p><b>Build :</b> ${env.BUILD_NUMBER}</p>
-
                 <p><b>Statut :</b> SUCCESS</p>
-
                 <p><b>Images Docker Hub :</b></p>
                 <ul>
                     <li>captainfrancis018/portfolio-backend:${env.BUILD_NUMBER}</li>
                     <li>captainfrancis018/portfolio-frontend:${env.BUILD_NUMBER}</li>
                 </ul>
-
                 <p><b>Pipeline Jenkins :</b></p>
-
-                <a href="${env.BUILD_URL}">
-                    ${env.BUILD_URL}
-                </a>
-
+                <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
                 <br><br>
-
                 <p>Le portfolio a été déployé avec succès.</p>
                 """,
-
                 mimeType: 'text/html',
-
                 to: 'abdoukarimsy018@gmail.com'
             )
         }
 
         failure {
-
             echo "Pipeline échoué — consulte les logs "
-
             emailext (
                 subject: "FAILURE - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-
                 body: """
                 <h2>Déploiement échoué </h2>
-
                 <p><b>Projet :</b> ${env.JOB_NAME}</p>
-
                 <p><b>Build :</b> ${env.BUILD_NUMBER}</p>
-
                 <p><b>Statut :</b> FAILURE</p>
-
                 <p><b>Consulter les logs Jenkins :</b></p>
-
-                <a href="${env.BUILD_URL}">
-                    ${env.BUILD_URL}
-                </a>
-
+                <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
                 <br><br>
-
                 <p>Une erreur est survenue pendant le pipeline.</p>
                 """,
-
                 mimeType: 'text/html',
-
                 to: 'abdoukarimsy018@gmail.com'
             )
         }
 
         always {
-
             echo "Nettoyage du workspace..."
-
             cleanWs()
         }
     }
