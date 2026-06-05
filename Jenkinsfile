@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent contrôleur
 
     environment {
         DOCKERHUB_USER  = 'rimka03'
