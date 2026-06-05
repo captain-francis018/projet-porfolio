@@ -84,13 +84,13 @@ pipeline {
             }
         }
 
-        // ── STAGE 5 : PUSH DOCKER HUB ────────────────────────
+       // ── STAGE 5 : PUSH DOCKER HUB ────────────────────
         stage('Push Docker Hub') {
             steps {
                 echo "Publication des images sur Docker Hub..."
 
                 withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-credentials',
+                    credentialsId: 'dokerhub_access',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
@@ -117,10 +117,9 @@ pipeline {
                     '''
                 }
 
-                echo "Images publiées ✅"
+                echo "Images publiées sur Docker Hub "
             }
         }
-
         // ── STAGE 6 : DEPLOY KUBERNETES ──────────────────────
         stage('Deploy') {
             steps {
