@@ -127,18 +127,18 @@ pipeline {
 
                 sh '''
                     # Appliquer les manifests
-                    kubectl apply -f k8s/mongodb-secret.yaml
-                    kubectl apply -f k8s/mongodb.yaml
-                    kubectl apply -f k8s/backend.yaml
-                    kubectl apply -f k8s/frontend.yaml
+                    /usr/local/bin/kubectl apply -f k8s/mongodb-secret.yaml
+                    /usr/local/bin/kubectl apply -f k8s/mongodb.yaml
+                    /usr/local/bin/kubectl apply -f k8s/backend.yaml
+                    /usr/local/bin/kubectl apply -f k8s/frontend.yaml
 
                     # Forcer le rechargement des nouvelles images
-                    kubectl rollout restart deployment/backend
-                    kubectl rollout restart deployment/frontend
+                    /usr/local/bin/kubectl rollout restart deployment/backend
+                    /usr/local/bin/kubectl rollout restart deployment/frontend
 
                     # Attendre que les déploiements soient prêts
-                    kubectl rollout status deployment/backend --timeout=120s
-                    kubectl rollout status deployment/frontend --timeout=120s
+                    /usr/local/bin/kubectl rollout status deployment/backend --timeout=120s
+                    /usr/local/bin/kubectl rollout status deployment/frontend --timeout=120s
                 '''
 
                 echo "Déploiement Kubernetes terminé ✅"
@@ -153,8 +153,8 @@ pipeline {
                 sh '''
                     sleep 10
 
-                    kubectl get pods
-                    kubectl get services
+                    /usr/local/bin/kubectl get pods
+                    /usr/local/bin/kubectl get services
 
                     echo "Test API..."
                     curl -sf http://localhost:30080/api/projects \
