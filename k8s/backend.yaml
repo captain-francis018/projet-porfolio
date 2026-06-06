@@ -25,6 +25,8 @@ spec:
               key: password
         - name: MONGODB_URI
           value: "mongodb://admin:$(MONGO_PASSWORD)@mongodb:27017/portfolio?authSource=admin"
+        - name: PORT
+          value: "5000"
 ---
 apiVersion: v1
 kind: Service
@@ -36,3 +38,4 @@ spec:
   ports:
   - port: 5000
     targetPort: 5000
+
