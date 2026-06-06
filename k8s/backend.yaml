@@ -23,7 +23,7 @@ spec:
             secretKeyRef:
               name: mongodb-secret
               key: password
-        - name: MONGO_URI
+        - name: MONGODB_URI
           value: "mongodb://admin:$(MONGO_PASSWORD)@mongodb:27017/portfolio?authSource=admin"
 ---
 apiVersion: v1
