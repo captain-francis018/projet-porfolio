@@ -23,3 +23,9 @@ Thumbs.db
 # Dossier temporaire Docker
 .dockerignore
 
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfplan
+.terraform.lock.hcl

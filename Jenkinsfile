@@ -8,6 +8,10 @@ pipeline {
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
         SONAR_URL       = 'http://192.168.30.20:9000'
         KUBECONFIG      = '/etc/rancher/k3s/k3s.yaml'
+
+        TF_VAR_backend_image    = "${DOCKERHUB_USER}/portfolio-backend:${env.BUILD_NUMBER}"
+        TF_VAR_frontend_image   = "${DOCKERHUB_USER}/portfolio-frontend:${env.BUILD_NUMBER}"
+        TF_VAR_mongodb_password = credentials('mongodb-password')
     }
 
     stages {
@@ -21,7 +25,7 @@ pipeline {
                     credentialsId: 'github-credentials',
                     url: 'https://github.com/captain-francis018/projet-porfolio.git'
 
-                echo "Code récupéré ✅"
+                echo "Code récupéré "
             }
         }
 
@@ -56,7 +60,7 @@ pipeline {
                     }
                 }
 
-                echo "Analyse terminée ✅"
+                echo "Analyse terminée "
             }
         }
 
@@ -69,7 +73,7 @@ pipeline {
                     waitForQualityGate abortPipeline: true
                 }
 
-                echo "Quality Gate passé ✅"
+                echo "Quality Gate passé "
             }
         }
 
@@ -80,17 +84,17 @@ pipeline {
 
                 sh 'docker compose build'
 
-                echo "Images construites ✅"
+                echo "Images construites "
             }
         }
 
-       // ── STAGE 5 : PUSH DOCKER HUB ────────────────────
+        // ── STAGE 5 : PUSH DOCKER HUB ────────────────────────
         stage('Push Docker Hub') {
             steps {
                 echo "Publication des images sur Docker Hub..."
 
                 withCredentials([usernamePassword(
-                    credentialsId: 'dokerhub_access',
+                    credentialsId: 'dockerhub-credentials',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
@@ -117,55 +121,80 @@ pipeline {
                     '''
                 }
 
-                echo "Images publiées sur Docker Hub "
+                echo "Images publiées "
             }
         }
-        // ── STAGE 6 : DEPLOY KUBERNETES ──────────────────────
-        stage('Deploy') {
+
+        // ── STAGE 6 : TERRAFORM INIT ─────────────────────────
+        stage('Terraform Init') {
             steps {
-                echo "Déploiement sur Kubernetes..."
+                echo "Initialisation Terraform..."
 
                 sh '''
-                    # Appliquer les manifests
-                    /usr/local/bin/kubectl apply -f k8s/mongodb-secret.yaml
-                    /usr/local/bin/kubectl apply -f k8s/mongodb.yaml
-                    /usr/local/bin/kubectl apply -f k8s/backend.yaml
-                    /usr/local/bin/kubectl apply -f k8s/frontend.yaml
-
-                    # Forcer le rechargement des nouvelles images
-                    /usr/local/bin/kubectl rollout restart deployment/backend
-                    /usr/local/bin/kubectl rollout restart deployment/frontend
-
-                    # Attendre que les déploiements soient prêts
-                    /usr/local/bin/kubectl rollout status deployment/backend --timeout=120s
-                    /usr/local/bin/kubectl rollout status deployment/frontend --timeout=120s
+                    cd terraform
+                    terraform init
                 '''
 
-                echo "Déploiement Kubernetes terminé ✅"
+                echo "Terraform initialisé "
             }
         }
 
-        // ── STAGE 7 : HEALTH CHECK ───────────────────────────
+        // ── STAGE 7 : TERRAFORM PLAN ─────────────────────────
+        stage('Terraform Plan') {
+            steps {
+                echo "Planification de l'infrastructure..."
+
+                sh '''
+                    cd terraform
+                    terraform plan -out=tfplan
+                '''
+                // tfplan = fichier binaire qui capture exactement ce qui sera fait
+                // Garantit que l'apply exécute exactement ce que le plan a prévu
+
+                echo "Plan généré "
+            }
+        }
+
+        // ── STAGE 8 : TERRAFORM APPLY ────────────────────────
+        stage('Terraform Apply') {
+            steps {
+                echo "Déploiement de l'infrastructure..."
+
+                sh '''
+                    cd terraform
+                    terraform apply -auto-approve tfplan
+                '''
+                // -auto-approve = pas de confirmation manuelle
+                // tfplan       = utilise exactement le plan généré au stage précédent
+
+                echo "Infrastructure déployée "
+            }
+        }
+
+        // ── STAGE 9 : HEALTH CHECK ───────────────────────────
         stage('Health Check') {
             steps {
                 echo "Vérification des services..."
 
                 sh '''
-                    sleep 10
+                    sleep 20
 
+                    echo "Pods en cours..."
                     /usr/local/bin/kubectl get pods
+
+                    echo "Services..."
                     /usr/local/bin/kubectl get services
 
                     echo "Test API..."
-                    curl -sf http://localhost:30080/api/projects \
-                        && echo "API OK ✅" \
-                        || (echo "API KO ❌" && exit 1)
+                    curl -sf http://192.168.30.20:30080/api/projects \
+                        && echo "API OK " \
+                        || (echo "API KO " && exit 1)
 
                     echo "Test Frontend..."
-                    curl -sf http://localhost:30080 \
+                    curl -sf http://192.168.30.20:30080 \
                         | grep -q "Abdoukarim" \
-                        && echo "Frontend OK ✅" \
-                        || (echo "Frontend KO ❌" && exit 1)
+                        && echo "Frontend OK " \
+                        || (echo "Frontend KO " && exit 1)
                 '''
             }
         }
@@ -175,12 +204,12 @@ pipeline {
     post {
 
         success {
-            echo "Pipeline réussi — Portfolio déployé ✅"
+            echo "Pipeline réussi — Portfolio déployé "
 
             emailext (
                 subject: "SUCCESS - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: """
-                <h2>Déploiement réussi ✅</h2>
+                <h2>Déploiement réussi </h2>
                 <p><b>Projet :</b> ${env.JOB_NAME}</p>
                 <p><b>Build :</b> ${env.BUILD_NUMBER}</p>
                 <p><b>Statut :</b> SUCCESS</p>
@@ -189,6 +218,7 @@ pipeline {
                     <li>rimka03/portfolio-backend:${env.BUILD_NUMBER}</li>
                     <li>rimka03/portfolio-frontend:${env.BUILD_NUMBER}</li>
                 </ul>
+                <p><b>Infrastructure :</b> Terraform apply réussi</p>
                 <p><b>Pipeline Jenkins :</b></p>
                 <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
                 <br><br>
@@ -200,12 +230,12 @@ pipeline {
         }
 
         failure {
-            echo "Pipeline échoué — consulte les logs ❌"
+            echo "Pipeline échoué — consulte les logs "
 
             emailext (
                 subject: "FAILURE - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: """
-                <h2>Déploiement échoué ❌</h2>
+                <h2>Déploiement échoué </h2>
                 <p><b>Projet :</b> ${env.JOB_NAME}</p>
                 <p><b>Build :</b> ${env.BUILD_NUMBER}</p>
                 <p><b>Statut :</b> FAILURE</p>
