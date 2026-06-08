@@ -9,9 +9,10 @@ pipeline {
         SONAR_URL       = 'http://192.168.30.20:9000'
         KUBECONFIG      = '/etc/rancher/k3s/k3s.yaml'
 
+        // CORRECTION : S'assurer que le credential existe
         TF_VAR_backend_image    = "${DOCKERHUB_USER}/portfolio-backend:${env.BUILD_NUMBER}"
         TF_VAR_frontend_image   = "${DOCKERHUB_USER}/portfolio-frontend:${env.BUILD_NUMBER}"
-        TF_VAR_mongodb_password = credentials('mongodb-password')
+        TF_VAR_mongodb_password = credentials('mongodb-password')  // À créer dans Jenkins avec le mot de passe MongoDB
     }
 
     stages {
@@ -200,12 +201,9 @@ pipeline {
         }
     }
 
-    // ── POST ACTIONS ─────────────────────────────────────────
     post {
-
         success {
             echo "Pipeline réussi — Portfolio déployé "
-
             emailext (
                 subject: "SUCCESS - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: """
@@ -231,7 +229,6 @@ pipeline {
 
         failure {
             echo "Pipeline échoué — consulte les logs "
-
             emailext (
                 subject: "FAILURE - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: """
@@ -250,8 +247,13 @@ pipeline {
         }
 
         always {
-            echo "Nettoyage du workspace..."
-            cleanWs()
+            script {
+                // CORRECTION : Nettoyer seulement si on a un workspace
+                if (env.WORKSPACE) {
+                    echo "Nettoyage du workspace..."
+                    cleanWs()
+                }
+            }
         }
     }
 }
