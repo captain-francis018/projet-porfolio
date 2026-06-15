@@ -6,7 +6,7 @@ pipeline {
         IMAGE_BACKEND   = "${DOCKERHUB_USER}/portfolio-backend"
         IMAGE_FRONTEND  = "${DOCKERHUB_USER}/portfolio-frontend"
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
-        SONAR_URL       = 'http://192.168.30.20:9000'
+        SONAR_URL       = 'http://192.168.30.10:9000'
         KUBECONFIG      = '/etc/rancher/k3s/k3s.yaml'
 
         // CORRECTION : S'assurer que le credential existe
