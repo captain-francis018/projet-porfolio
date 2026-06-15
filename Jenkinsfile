@@ -95,7 +95,7 @@ pipeline {
                 echo "Publication des images sur Docker Hub..."
 
                 withCredentials([usernamePassword(
-                    credentialsId: 'dokerhub_access',
+                    credentialsId: 'dockerhub_access_pc_portable',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
