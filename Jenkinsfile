@@ -1,20 +1,20 @@
 pipeline {
-    agent { label "linux" }
+    agent any
 
     environment {
         DOCKERHUB_USER  = 'rimka03'
         IMAGE_BACKEND   = "${DOCKERHUB_USER}/portfolio-backend"
         IMAGE_FRONTEND  = "${DOCKERHUB_USER}/portfolio-frontend"
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
-        SONAR_URL       = 'http://192.168.30.10:9000'
-        KUBECONFIG      = '/etc/rancher/k3s/k3s.yaml'
+        SONAR_URL       = 'http://192.168.30.20:9000'
+        KUBECONFIG      = '/home/jenkins/.kube/config'
 
         // CORRECTION : S'assurer que le credential existe
         TF_VAR_backend_image    = "${DOCKERHUB_USER}/portfolio-backend:${env.BUILD_NUMBER}"
         TF_VAR_frontend_image   = "${DOCKERHUB_USER}/portfolio-frontend:${env.BUILD_NUMBER}"
         TF_VAR_mongodb_password = credentials('mongodb-password')  // À créer dans Jenkins avec le mot de passe MongoDB
     }
-	//test
+
     stages {
 
         // ── STAGE 1 : CLONE ──────────────────────────────────
@@ -23,7 +23,7 @@ pipeline {
                 echo "Récupération du code depuis GitHub..."
 
                 git branch: 'main',
-                    credentialsId: 'Github-credentials_portable',
+                    credentialsId: 'github-credentials',
                     url: 'https://github.com/captain-francis018/projet-porfolio.git'
 
                 echo "Code récupéré "
@@ -36,7 +36,7 @@ pipeline {
                 echo "Analyse qualité du code..."
 
                 withSonarQubeEnv('sonarqube-server') {
-                    withCredentials([string(credentialsId: 'sanarqube_access', variable: 'SONAR_TOKEN')]) {
+                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
                         sh '''
                             cd backend
                             /usr/bin/npx sonar-scanner \
@@ -95,7 +95,7 @@ pipeline {
                 echo "Publication des images sur Docker Hub..."
 
                 withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub_access_pc_portable',
+                    credentialsId: 'dokerhub_access',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
@@ -187,12 +187,12 @@ pipeline {
                     /usr/local/bin/kubectl get services
 
                     echo "Test API..."
-                    curl -sf http://192.168.30.10:30080/api/projects \
+                    curl -sf http://192.168.30.20:30080/api/projects \
                         && echo "API OK " \
                         || (echo "API KO " && exit 1)
 
                     echo "Test Frontend..."
-                    curl -sf http://192.168.30.10:30080 \
+                    curl -sf http://192.168.30.20:30080 \
                         | grep -q "Abdoukarim" \
                         && echo "Frontend OK " \
                         || (echo "Frontend KO " && exit 1)
