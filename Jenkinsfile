@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent { label "linux" }
 
     environment {
         DOCKERHUB_USER  = 'rimka03'
@@ -15,6 +15,7 @@ pipeline {
         TF_VAR_mongodb_password = credentials('mongodb-password')  // À créer dans Jenkins avec le mot de passe MongoDB
     }
 
+	//test
     stages {
 
         // ── STAGE 1 : CLONE ──────────────────────────────────
@@ -23,7 +24,7 @@ pipeline {
                 echo "Récupération du code depuis GitHub..."
 
                 git branch: 'feat-pc',
-                    credentialsId: 'github-credentials',
+                    credentialsId: 'Github-credentials_portable',
                     url: 'https://github.com/captain-francis018/projet-porfolio.git'
 
                 echo "Code récupéré "
@@ -36,7 +37,7 @@ pipeline {
                 echo "Analyse qualité du code..."
 
                 withSonarQubeEnv('sonarqube-server') {
-                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                    withCredentials([string(credentialsId: 'sanarqube_access', variable: 'SONAR_TOKEN')]) {
                         sh '''
                             cd backend
                             /usr/bin/npx sonar-scanner \
@@ -95,7 +96,7 @@ pipeline {
                 echo "Publication des images sur Docker Hub..."
 
                 withCredentials([usernamePassword(
-                    credentialsId: 'dokerhub_access',
+                    credentialsId: 'dockerhub_access_pc_portable',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
@@ -187,12 +188,12 @@ pipeline {
                     /usr/local/bin/kubectl get services
 
                     echo "Test API..."
-                    curl -sf http://192.168.30.20:30080/api/projects \
+                    curl -sf http://192.168.30.10:30080/api/projects \
                         && echo "API OK " \
                         || (echo "API KO " && exit 1)
 
                     echo "Test Frontend..."
-                    curl -sf http://192.168.30.20:30080 \
+                    curl -sf http://192.168.30.10:30080 \
                         | grep -q "Abdoukarim" \
                         && echo "Frontend OK " \
                         || (echo "Frontend KO " && exit 1)
