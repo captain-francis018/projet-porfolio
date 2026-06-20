@@ -9,5 +9,5 @@ terraform {
 }
 
 provider "kubernetes" {
-    config_path = "/home/vagrant/.kube/config"
+    config_path = "/home/jenkins/.kube/config"
 }
