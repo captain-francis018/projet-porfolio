@@ -6,7 +6,7 @@ pipeline {
         IMAGE_BACKEND   = "${DOCKERHUB_USER}/portfolio-backend"
         IMAGE_FRONTEND  = "${DOCKERHUB_USER}/portfolio-frontend"
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
-        SONAR_URL       = 'http://192.168.30.20:9000'
+        SONAR_URL       = 'http://192.168.30.10:9000'
         KUBECONFIG      = '/home/jenkins/.kube/config'
 
         // CORRECTION : S'assurer que le credential existe
@@ -22,7 +22,7 @@ pipeline {
             steps {
                 echo "Récupération du code depuis GitHub..."
 
-                git branch: 'main',
+                git branch: 'feat-pc',
                     credentialsId: 'github-credentials',
                     url: 'https://github.com/captain-francis018/projet-porfolio.git'
 
