@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent { label "linux" }
 
     environment {
         DOCKERHUB_USER  = 'rimka03'
