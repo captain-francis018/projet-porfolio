@@ -14,7 +14,7 @@ pipeline {
         TF_VAR_frontend_image   = "${DOCKERHUB_USER}/portfolio-frontend:${env.BUILD_NUMBER}"
         TF_VAR_mongodb_password = credentials('mongodb-password')  // À créer dans Jenkins avec le mot de passe MongoDB
     }
-
+	//test
     stages {
 
         // ── STAGE 1 : CLONE ──────────────────────────────────
