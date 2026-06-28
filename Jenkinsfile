@@ -111,7 +111,10 @@ pipeline {
                     # Bloque uniquement si une faille CRITICAL est trouvée
                     trivy fs --severity CRITICAL \
                         --exit-code 1 \
-                        backend/ frontend/
+                        backend/
+		    trivy fs --severity CRITICAL \
+                        --exit-code 1 \
+                        frontend/
                 '''
 
                 echo "Scan code source terminé ✅"
@@ -127,11 +130,19 @@ pipeline {
                     trivy config --severity LOW,MEDIUM,HIGH,CRITICAL \
                         --format json -o trivy-reports/k8s-config.json \
                         --exit-code 0 \
-                        k8s/ terraform/
+                        k8s/
+
+                    trivy config --severity LOW,MEDIUM,HIGH,CRITICAL \
+                        --format json -o trivy-reports/k8s-config.json \
+                        --exit-code 0 \
+                        terraform/
 
                     trivy config --severity CRITICAL \
                         --exit-code 1 \
-                        k8s/ terraform/
+                        k8s/
+		    trivy config --severity CRITICAL \
+                        --exit-code 1 \
+                        terraform/
                 '''
 
                 echo "Scan manifests terminé ✅"
